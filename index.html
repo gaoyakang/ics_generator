@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-cn">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -291,6 +291,18 @@
         document.getElementById("alarmTime").value = "0";
       }
 
+      function saveEventsToStorage() {
+        localStorage.setItem("events", JSON.stringify(events));
+      }
+
+      function loadEventsFromStorage() {
+        const storedEvents = localStorage.getItem("events");
+        if (storedEvents) {
+          events = JSON.parse(storedEvents);
+          updateEventList(); // 更新页面上的日程列表
+        }
+      }
+
       function addEvent() {
         const summary = sanitizeInput(
           document.getElementById("summary").value,
@@ -334,13 +346,9 @@
         closeModal();
         showToast("日程已添加！", "success");
         updateEventList();
+        saveEventsToStorage(); // 保存到 localStorage
       }
 
-      function generateRandom() {
-        // 生成一个随机的32位整数并转换为16进制字符串
-        const randomInt = Math.floor(Math.random() * 0x100000000); // 0x100000000 是 2^32
-        return randomInt.toString(16).padStart(8, "0"); // 转换为8位十六进制字符串
-      }
       function updateEventList() {
         const eventList = document.getElementById("eventList");
         eventList.innerHTML = "";
@@ -358,6 +366,7 @@
           // 将删除按钮添加到日程项中
           item.appendChild(deleteButton);
 
+          // 绑定点击事件
           item.onclick = () => openEditModal(index);
           eventList.appendChild(item);
         });
@@ -367,13 +376,23 @@
         events.splice(index, 1); // 删除指定索引的日程
         showToast("日程已删除！", "success");
         updateEventList(); // 更新日程列表
+        saveEventsToStorage(); // 更新 localStorage
       }
 
       function openEditModal(index) {
+        if (!events[index]) {
+          return;
+        }
+
         const event = events[index];
         document.getElementById("summary").value = event.summary;
-        document.getElementById("dtstart").value = event.dtstart;
-        document.getElementById("dtend").value = event.dtend;
+
+        // 格式化 dtstart 和 dtend 为 YYYY-MM-DDTHH:MM 格式
+        const dtstartFormatted = formatDateTimeForInput(event.dtstart);
+        const dtendFormatted = formatDateTimeForInput(event.dtend);
+
+        document.getElementById("dtstart").value = dtstartFormatted;
+        document.getElementById("dtend").value = dtendFormatted;
         document.getElementById("description").value = event.description;
         document.getElementById("alarmTime").value = event.alarmTime;
         document.getElementById("eventModal").style.display = "block";
@@ -407,7 +426,7 @@
 
         const dtstart = formatDate(dtstartInput);
         const dtend = formatDate(dtendInput);
-        const dtstamp = formatDate(new Date().toISOString().replace("Z", ""));
+        const dtstamp = generateRandom();
 
         events[index] = {
           summary,
@@ -422,6 +441,12 @@
         closeModal();
         showToast("日程已更新！", "success");
         updateEventList();
+        saveEventsToStorage(); // 保存到 localStorage
+      }
+
+      function generateRandom() {
+        const randomInt = Math.floor(Math.random() * 0x100000000); // 0x100000000 是 2^32
+        return randomInt.toString(16).padStart(8, "0"); // 转换为8位十六进制字符串
       }
 
       function generateICS() {
@@ -433,14 +458,14 @@ METHOD:PUBLISH
 X-WR-CALNAME: ${calendarName}
 X-WR-TIMEZONE:Asia/Shanghai
 
-      ${events
-        .map(
-          (event) => `
+${events
+  .map(
+    (event) => `
 BEGIN:VEVENT
 SUMMARY:${event.summary}
 DTSTART:${event.dtstart}
 DTEND:${event.dtend}
-DTSTAMP:${formatDate(new Date().toISOString().replace("Z", ""))}
+DTSTAMP:${event.dtstamp}
 UID:${event.dtstamp}
 DESCRIPTION:${event.description}
 LOCATION:Beijing, China
@@ -453,13 +478,14 @@ TRIGGER:-PT${event.alarmTime}M
 END:VALARM
 
 END:VEVENT`
-        )
-        .join("\n")}
+  )
+  .join("\n")}
 
 END:VCALENDAR`;
 
         document.getElementById("result").value = icsContent;
       }
+
       function sanitizeInput(input, maxLength) {
         const sanitized = input
           .replace(/<[^>]*>/g, "")
@@ -479,6 +505,15 @@ END:VCALENDAR`;
         const [year, month, day] = date.split("-");
         const [hours, minutes] = time.split(":");
         return `${year}${month}${day}T${hours}${minutes}00`;
+      }
+
+      function formatDateTimeForInput(datetime) {
+        const year = datetime.substring(0, 4);
+        const month = datetime.substring(4, 6);
+        const day = datetime.substring(6, 8);
+        const hours = datetime.substring(9, 11);
+        const minutes = datetime.substring(11, 13);
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
       }
 
       function copyToClipboard() {
@@ -519,6 +554,11 @@ END:VCALENDAR`;
           toast.classList.add("hide");
         }, 3000);
       }
+
+      // 在页面加载时从 localStorage 加载日程
+      window.onload = () => {
+        loadEventsFromStorage();
+      };
     </script>
   </body>
 </html>
