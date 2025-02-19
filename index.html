@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ICS 文件生成器</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f9f9f9;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+      }
+      @media (max-width: 768px) {
+        body {
+          flex-direction: column;
+        }
+      }
+      .container {
+        width: 50%;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin: 20px;
+      }
+      @media (max-width: 768px) {
+        .container {
+          width: 100%;
+          margin: 10px 0;
+        }
+      }
+      h1 {
+        text-align: center;
+        color: #4caf50;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      textarea {
+        resize: vertical;
+      }
+      button {
+        padding: 10px 20px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-top: 10px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      .result {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f1f1f1;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      #result {
+        min-height: 490px;
+      }
+      .result textarea {
+        width: 100%;
+        height: 200px;
+        margin-top: 10px;
+      }
+      .copy-button {
+        margin-top: 10px;
+        text-align: center;
+      }
+      .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        color: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        display: none;
+        z-index: 1000;
+      }
+      .toast.success {
+        background-color: #4caf50;
+      }
+      .toast.error {
+        background-color: #d32f2f; /* 红色 */
+      }
+      .toast.hide {
+        display: none;
+      }
+      .toast.show {
+        display: block;
+        animation: fadeOut 3s;
+      }
+      @keyframes fadeOut {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toast" id="toast">内容已复制到剪贴板！</div>
+
+    <div class="container">
+      <h1>输入区域</h1>
+      <form id="icsForm">
+        <div class="form-group">
+          <label for="calendarName">日历名称:</label>
+          <input
+            type="text"
+            id="calendarName"
+            name="calendarName"
+            required
+            placeholder="请输入日历名称"
+          />
+        </div>
+        <div class="form-group">
+          <label for="summary">日程名称:</label>
+          <input
+            type="text"
+            id="summary"
+            name="summary"
+            required
+            placeholder="请输入日程名称"
+          />
+        </div>
+        <div class="form-group">
+          <label for="dtstart">开始时间:</label>
+          <input type="datetime-local" id="dtstart" name="dtstart" required />
+        </div>
+        <div class="form-group">
+          <label for="dtend">结束时间:</label>
+          <input type="datetime-local" id="dtend" name="dtend" required />
+        </div>
+        <div class="form-group">
+          <label for="description">描述:</label>
+          <textarea
+            id="description"
+            name="description"
+            rows="3"
+            placeholder="请输入日程描述"
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="alarmTime">提前触发时间（分钟）:</label>
+          <select id="alarmTime" name="alarmTime">
+            <option value="0">准时触发</option>
+            <option value="5">提前5分钟</option>
+            <option value="10">提前10分钟</option>
+            <option value="15">提前15分钟</option>
+            <option value="30">提前30分钟</option>
+            <option value="60">提前1小时</option>
+            <option value="120">提前2小时</option>
+            <option value="1440">提前1天</option>
+            <option value="2880">提前2天</option>
+            <option value="10080">提前1周</option>
+          </select>
+        </div>
+        <button type="button" onclick="generateICS()" class="geneics">
+          生成 ICS 文件
+        </button>
+      </form>
+    </div>
+    <div class="container">
+      <h1>ICS 文件显示区域</h1>
+      <textarea id="result" class="result" readonly></textarea>
+      <div class="copy-button">
+        <button type="button" onclick="copyToClipboard()">复制内容</button>
+      </div>
+    </div>
+
+    <script>
+      function generateICS() {
+        // 获取用户输入
+        const calendarName = sanitizeInput(
+          document.getElementById("calendarName").value,
+          20
+        );
+        if (!calendarName) return; // 如果出错，直接返回
+
+        const summary = sanitizeInput(
+          document.getElementById("summary").value,
+          40
+        );
+        if (!summary) return; // 如果出错，直接返回
+
+        const description = sanitizeInput(
+          document.getElementById("description").value,
+          60
+        );
+        if (!description) return; // 如果出错，直接返回
+
+        const dtstartInput = document.getElementById("dtstart").value;
+        const dtendInput = document.getElementById("dtend").value;
+        const alarmTime = parseInt(
+          document.getElementById("alarmTime").value,
+          10
+        );
+
+        // 格式化时间（YYYYMMDDTHHMMSS）
+        const formatDate = (datetime) => {
+          const [date, time] = datetime.split("T");
+          const [year, month, day] = date.split("-");
+          const [hours, minutes] = time.split(":");
+          return `${year}${month}${day}T${hours}${minutes}00`;
+        };
+
+        const dtstart = formatDate(dtstartInput);
+        const dtend = formatDate(dtendInput);
+        const dtstamp = formatDate(new Date().toISOString().replace("Z", ""));
+
+        // 构建 ICS 文件内容
+        const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Your Company//Your Product//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME: ${calendarName}
+X-WR-TIMEZONE:Asia/Shanghai
+
+BEGIN:VEVENT
+SUMMARY:${summary}
+DTSTART:${dtstart}
+DTEND:${dtend}
+DTSTAMP:${dtstamp}
+UID:${dtstamp}-test1
+DESCRIPTION:${description}
+LOCATION:Beijing, China
+STATUS:CONFIRMED
+PRIORITY:1
+
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-PT${alarmTime}M
+END:VALARM
+
+END:VEVENT
+END:VCALENDAR`;
+
+        // 显示 ICS 文件内容
+        document.getElementById("result").value = icsContent;
+      }
+
+      function sanitizeInput(input, maxLength) {
+        // 清理输入内容，移除HTML标签和特殊字符
+        const sanitized = input
+          .replace(/<[^>]*>/g, "")
+          .replace(/[^a-zA-Z0-9\u4e00-\u9fa5\s]/g, "");
+        if (sanitized.length > maxLength) {
+          showToast(
+            `输入过长，请确保内容不超过 ${maxLength} 个字符。`,
+            "error"
+          );
+          return null;
+        }
+        return sanitized;
+      }
+
+      function copyToClipboard() {
+        const textarea = document.getElementById("result");
+        textarea.select(); // 选中内容
+        textarea.setSelectionRange(0, 99999); // 确保所有内容都被选中
+        try {
+          const successful = document.execCommand("copy");
+          showToast(
+            successful ? "内容已复制到剪贴板！" : "复制失败，请手动复制内容。",
+            "success"
+          );
+        } catch (err) {
+          showToast("复制失败，请手动复制内容。", "error");
+        }
+      }
+
+      function showToast(message, type = "success") {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.classList.remove("hide", "success", "error");
+        toast.classList.add(type === "error" ? "error" : "success", "show");
+        setTimeout(() => {
+          toast.classList.remove("show");
+          toast.classList.add("hide");
+        }, 3000); // 3秒后隐藏
+      }
+    </script>
+  </body>
+</html>
