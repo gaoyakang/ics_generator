@@ -264,7 +264,7 @@
             <option value="10080">提前1周</option>
           </select>
         </div>
-        <button type="button" onclick="addEvent()">添加日程</button>
+        <button type="button" onclick="addEvent()">保存日程</button>
       </div>
     </div>
 
@@ -273,6 +273,8 @@
     <script>
       let events = [];
       let calendarName = "默认日历";
+      let isEditing = false; // 添加一个标志来区分添加和编辑模式
+      let currentEditingEventId = null; // 用于存储当前编辑的日程 ID
 
       function openModal() {
         document.getElementById("eventModal").style.display = "block";
@@ -281,6 +283,9 @@
       function closeModal() {
         document.getElementById("eventModal").style.display = "none";
         clearModalInputs();
+        isEditing = false; // 重置编辑模式标志
+        currentEditingEventId = null; // 清空当前编辑的日程 ID
+        document.querySelector("button").textContent = "添加日程"; // 重置按钮文本
       }
 
       function clearModalInputs() {
@@ -304,6 +309,12 @@
       }
 
       function addEvent() {
+        if (isEditing) {
+          // 如果处于编辑模式，调用 editEvent 函数
+          editEvent(currentEditingEventId);
+          return;
+        }
+
         const summary = sanitizeInput(
           document.getElementById("summary").value,
           40
@@ -331,8 +342,10 @@
         const dtstart = formatDate(dtstartInput);
         const dtend = formatDate(dtendInput);
         const dtstamp = generateRandom();
+        const eventId = generateUniqueId();
 
         const event = {
+          id: eventId,
           summary,
           dtstart,
           dtend,
@@ -346,60 +359,67 @@
         closeModal();
         showToast("日程已添加！", "success");
         updateEventList();
-        saveEventsToStorage(); // 保存到 localStorage
+        saveEventsToStorage();
       }
 
       function updateEventList() {
         const eventList = document.getElementById("eventList");
         eventList.innerHTML = "";
-        events.forEach((event, index) => {
+        events.forEach((event) => {
           const item = document.createElement("li");
           item.classList.add("event-item");
           item.textContent = `日程：${event.summary}`;
 
-          // 添加删除按钮
           const deleteButton = document.createElement("span");
           deleteButton.textContent = "×";
           deleteButton.classList.add("close");
-          deleteButton.onclick = () => deleteEvent(index);
+          deleteButton.onclick = () => deleteEvent(event.id);
 
-          // 将删除按钮添加到日程项中
           item.appendChild(deleteButton);
-
-          // 绑定点击事件
-          item.onclick = () => openEditModal(index);
+          item.onclick = () => openEditModal(event.id);
           eventList.appendChild(item);
         });
       }
 
-      function deleteEvent(index) {
-        events.splice(index, 1); // 删除指定索引的日程
-        showToast("日程已删除！", "success");
-        updateEventList(); // 更新日程列表
-        saveEventsToStorage(); // 更新 localStorage
-      }
-
-      function openEditModal(index) {
-        if (!events[index]) {
+      function deleteEvent(eventId) {
+        const eventIndex = events.findIndex((e) => e.id === eventId);
+        if (eventIndex === -1) {
+          showToast("日程不存在！", "error");
           return;
         }
 
-        const event = events[index];
-        document.getElementById("summary").value = event.summary;
-
-        // 格式化 dtstart 和 dtend 为 YYYY-MM-DDTHH:MM 格式
-        const dtstartFormatted = formatDateTimeForInput(event.dtstart);
-        const dtendFormatted = formatDateTimeForInput(event.dtend);
-
-        document.getElementById("dtstart").value = dtstartFormatted;
-        document.getElementById("dtend").value = dtendFormatted;
-        document.getElementById("description").value = event.description;
-        document.getElementById("alarmTime").value = event.alarmTime;
-        document.getElementById("eventModal").style.display = "block";
-        document.querySelector("button").onclick = () => editEvent(index);
+        events.splice(eventIndex, 1);
+        showToast("日程已删除！", "success");
+        updateEventList();
+        saveEventsToStorage();
       }
 
-      function editEvent(index) {
+      function openEditModal(eventId) {
+        const event = events.find((e) => e.id === eventId);
+        if (!event) {
+          showToast("日程不存在！", "error");
+          return;
+        }
+
+        document.getElementById("summary").value = event.summary;
+        document.getElementById("dtstart").value = formatDateTimeForInput(
+          event.dtstart
+        );
+        document.getElementById("dtend").value = formatDateTimeForInput(
+          event.dtend
+        );
+        document.getElementById("description").value = event.description;
+        document.getElementById("alarmTime").value = event.alarmTime;
+
+        isEditing = true;
+        currentEditingEventId = eventId;
+
+        document.getElementById("eventModal").style.display = "block";
+        document.querySelector("button").onclick = () => editEvent(eventId);
+        document.querySelector("button").textContent = "保存更改";
+      }
+
+      function editEvent(eventId) {
         const summary = sanitizeInput(
           document.getElementById("summary").value,
           40
@@ -428,25 +448,34 @@
         const dtend = formatDate(dtendInput);
         const dtstamp = generateRandom();
 
-        events[index] = {
-          summary,
-          dtstart,
-          dtend,
-          description,
-          alarmTime,
-          dtstamp,
-          calendarName,
-        };
+        const event = events.find((e) => e.id === eventId);
+        if (!event) {
+          showToast("日程不存在！", "error");
+          return;
+        }
+
+        event.summary = summary;
+        event.dtstart = dtstart;
+        event.dtend = dtend;
+        event.description = description;
+        event.alarmTime = alarmTime;
+        event.dtstamp = dtstamp;
 
         closeModal();
         showToast("日程已更新！", "success");
         updateEventList();
-        saveEventsToStorage(); // 保存到 localStorage
+        saveEventsToStorage();
       }
 
       function generateRandom() {
-        const randomInt = Math.floor(Math.random() * 0x100000000); // 0x100000000 是 2^32
-        return randomInt.toString(16).padStart(8, "0"); // 转换为8位十六进制字符串
+        const randomInt = Math.floor(Math.random() * 0x100000000);
+        return randomInt.toString(16).padStart(8, "0");
+      }
+
+      function generateUniqueId() {
+        return (
+          Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+        );
       }
 
       function generateICS() {
@@ -466,7 +495,7 @@ SUMMARY:${event.summary}
 DTSTART:${event.dtstart}
 DTEND:${event.dtend}
 DTSTAMP:${event.dtstamp}
-UID:${event.dtstamp}
+UID:${event.id}
 DESCRIPTION:${event.description}
 LOCATION:Beijing, China
 STATUS:CONFIRMED
@@ -532,7 +561,7 @@ END:VCALENDAR`;
       }
 
       function clearResult() {
-        document.getElementById("result").value = ""; // 清空 textarea 内容
+        document.getElementById("result").value = "";
         showToast("内容已清空！", "success");
       }
 
@@ -555,7 +584,6 @@ END:VCALENDAR`;
         }, 3000);
       }
 
-      // 在页面加载时从 localStorage 加载日程
       window.onload = () => {
         loadEventsFromStorage();
       };
