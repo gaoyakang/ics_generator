@@ -303,9 +303,17 @@
       function loadEventsFromStorage() {
         const storedEvents = localStorage.getItem("events");
         if (storedEvents) {
-          events = JSON.parse(storedEvents);
-          updateEventList(); // 更新页面上的日程列表
+          try {
+            events = JSON.parse(storedEvents);
+          } catch (error) {
+            console.error("加载 events 数据失败:", error);
+            showToast("加载日程失败，请刷新页面！", "error");
+            events = []; // 回退为空数组
+          }
+        } else {
+          events = []; // 如果没有数据，初始化为空数组
         }
+        updateEventList(); // 确保页面加载时更新事件列表
       }
 
       function addEvent() {
@@ -354,8 +362,9 @@
           dtstamp,
           calendarName,
         };
-
+        console.log("添加日程前：", events);
         events.push(event);
+        console.log("添加日程后：", events);
         closeModal();
         showToast("日程已添加！", "success");
         updateEventList();
@@ -364,7 +373,8 @@
 
       function updateEventList() {
         const eventList = document.getElementById("eventList");
-        eventList.innerHTML = "";
+        eventList.innerHTML = ""; // 清空事件列表
+
         events.forEach((event) => {
           const item = document.createElement("li");
           item.classList.add("event-item");
@@ -373,13 +383,29 @@
           const deleteButton = document.createElement("span");
           deleteButton.textContent = "×";
           deleteButton.classList.add("close");
-          deleteButton.onclick = () => deleteEvent(event.id);
+
+          // 使用事件委托，避免直接绑定事件
+          item.dataset.eventId = event.id; // 为事件项添加数据属性
+          deleteButton.dataset.eventId = event.id;
 
           item.appendChild(deleteButton);
-          item.onclick = () => openEditModal(event.id);
           eventList.appendChild(item);
         });
       }
+
+      // 事件委托：监听事件列表的点击事件
+      document.getElementById("eventList").addEventListener("click", (e) => {
+        const target = e.target;
+        if (target.classList.contains("close")) {
+          // 如果点击的是删除按钮
+          const eventId = target.dataset.eventId;
+          deleteEvent(eventId);
+        } else if (target.classList.contains("event-item")) {
+          // 如果点击的是事件项
+          const eventId = target.dataset.eventId;
+          openEditModal(eventId);
+        }
+      });
 
       function deleteEvent(eventId) {
         const eventIndex = events.findIndex((e) => e.id === eventId);
@@ -388,9 +414,9 @@
           return;
         }
 
-        events.splice(eventIndex, 1);
+        events.splice(eventIndex, 1); // 删除事件
         showToast("日程已删除！", "success");
-        updateEventList();
+        updateEventList(); // 重新渲染事件列表
         saveEventsToStorage();
       }
 
@@ -586,6 +612,7 @@ END:VCALENDAR`;
 
       window.onload = () => {
         loadEventsFromStorage();
+        updateEventList(); // 确保页面加载时更新事件列表
       };
     </script>
   </body>
