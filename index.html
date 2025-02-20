@@ -329,6 +329,13 @@
         );
         if (!summary) return;
 
+        // 检查是否已经存在相同的日程名字
+        const existingEvent = events.find((e) => e.summary === summary);
+        if (existingEvent) {
+          showToast("日程名字已存在，请使用不同的名字！", "error");
+          return;
+        }
+
         const dtstartInput = document.getElementById("dtstart").value;
         const dtendInput = document.getElementById("dtend").value;
         const description = sanitizeInput(
@@ -362,9 +369,8 @@
           dtstamp,
           calendarName,
         };
-        console.log("添加日程前：", events);
+
         events.push(event);
-        console.log("添加日程后：", events);
         closeModal();
         showToast("日程已添加！", "success");
         updateEventList();
@@ -451,6 +457,15 @@
           40
         );
         if (!summary) return;
+
+        // 检查是否已经存在相同的日程名字（排除当前编辑的日程）
+        const existingEvent = events.find(
+          (e) => e.summary === summary && e.id !== eventId
+        );
+        if (existingEvent) {
+          showToast("日程名字已存在，请使用不同的名字！", "error");
+          return;
+        }
 
         const dtstartInput = document.getElementById("dtstart").value;
         const dtendInput = document.getElementById("dtend").value;
